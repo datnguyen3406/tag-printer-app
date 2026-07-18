@@ -25,32 +25,109 @@ const TEMPLATE_DIR = path.join(__dirname, 'templates');
 });
 
 const loadExcelToRAM = () => {
-    masterDictionary = {}; 
-    const files = fs.readdirSync(DATA_DIR).filter(f => f.endsWith('.xlsx'));
-    
+
+    masterDictionary = {};
+
+    const files = fs.readdirSync(DATA_DIR)
+        .filter(f => f.toLowerCase().endsWith(".xlsx"));
+
+    console.log("Đang đọc:", files);
+
     files.forEach(file => {
+
         try {
+
             const workbook = xlsx.readFile(path.join(DATA_DIR, file));
-            const sheet = workbook.Sheets[workbook.SheetNames[0]]; 
-            const data = xlsx.utils.sheet_to_json(sheet);
-            
-            data.forEach(row => {
-                const barcode = row.BARCODE ? String(row.BARCODE).trim() : '';
-                if (barcode !== '') {
-                    masterDictionary[barcode] = {
-                        barcode: barcode,
-                        tenSp: String(row['TEN_SP FINAL'] || row['NAME PRODUCT'] || row.TEN_SP || '').trim(),
-                        ticket: String(row.TICKET || '0').trim()
-                    };
-                }
+
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+
+            const rawData = xlsx.utils.sheet_to_json(sheet, {
+                header: 1,
+                raw: false,
+                defval: ""
             });
-            console.log(`✅ Đã nạp file: ${file}`);
-        } catch (err) {
-            console.error(`❌ Lỗi đọc file ${file}:`, err);
+
+            let headerRow = -1;
+            let headers = [];
+
+            for (let i = 0; i < rawData.length; i++) {
+
+                const row = rawData[i].map(x =>
+                    String(x).trim().toUpperCase()
+                );
+
+                if (
+                    row.includes("BARCODE") ||
+                    row.includes("PRODUCT CODE")
+                ) {
+
+                    headerRow = i;
+                    headers = row;
+                    break;
+                }
+            }
+
+            if (headerRow === -1) {
+                console.log(file, "không tìm thấy header");
+                return;
+            }
+
+            let count = 0;
+
+            for (let i = headerRow + 1; i < rawData.length; i++) {
+
+                const row = rawData[i];
+
+                if (!row.length) continue;
+
+                let obj = {};
+
+                headers.forEach((h, index) => {
+                    obj[h] = row[index];
+                });
+
+                const barcode = String(
+                    obj["BARCODE"] ||
+                    obj["PRODUCT CODE"] ||
+                    ""
+                ).trim();
+
+                if (!barcode) continue;
+
+                masterDictionary[barcode] = {
+
+                    barcode,
+
+                    tenSp: String(
+                        obj["PRODUCT DESCRIPTION"] ||
+                        obj["NAME PRODUCT"] ||
+                        obj["TEN_SP FINAL"] ||
+                        ""
+                    ).trim(),
+
+                    ticket: String(
+                        obj["UNIT TICKET VALUE"] ||
+                        obj["TICKET"] ||
+                        ""
+                    ).trim()
+                };
+
+                count++;
+            }
+
+            console.log(`${file}: ${count} sản phẩm`);
+
         }
+        catch (e) {
+            console.log(e);
+        }
+
     });
+
+    console.log("Tổng:", Object.keys(masterDictionary).length);
+
 };
-loadExcelToRAM();
+loadExcelToRAM;
 
 const excelStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'data/'),

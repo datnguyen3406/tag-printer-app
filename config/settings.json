@@ -1,7 +1,5 @@
 {
-  "width": "65",
-  "height": "35",
-  "gap": "5",
-  "font": "13",
-  "bgUrl": null
+  "size": "large",
+  "font": "15",
+  "bgUrl": "/templates/bg-1784363027098.png"
 }

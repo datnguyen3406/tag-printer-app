@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản Lý In Ấn</title>
     <style>
-        :root { --tag-width: 65mm; --tag-height: 35mm; --tag-gap: 5mm; --tag-font-size: 13px; --tag-bg-image: none; }
+        :root { --tag-width: 73mm; --tag-height: 40mm; --tag-gap: 5mm; --tag-font-size: 13px; --tag-bg-image: none; }
         body { font-family: Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; }
         .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 14px; color: #4b5563; font-weight: bold;}
         .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
@@ -40,16 +40,46 @@
             #print-area, #print-area * { visibility: visible; }
             #print-area { display: block; position: absolute; left: 0; top: 0; width: 210mm; }
             .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--tag-width)); gap: var(--tag-gap); padding: 10mm; justify-content: center; }
-            .tag-box { border: 1px dashed #ccc; width: var(--tag-width); height: var(--tag-height); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; overflow: hidden; padding: 10px; background-image: var(--tag-bg-image); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
-            .tag-price { font-size: calc(var(--tag-font-size) + 12px); font-weight: 900; color: #000; line-height: 1; text-shadow: 1px 1px 2px rgba(255,255,255,0.9);}
-            .tag-name { font-size: var(--tag-font-size); font-weight: bold; text-align: center; text-shadow: 1px 1px 2px rgba(255,255,255,0.9);}
+            .tag-box { 
+                border: 1px dashed #ccc; 
+                width: var(--tag-width); 
+                height: var(--tag-height); 
+                box-sizing: border-box; 
+                display: flex; 
+                flex-direction: column; 
+                justify-content: center; 
+                align-items: center; 
+                gap: 5px; 
+                overflow: hidden; 
+                padding: 10px; 
+                background-image: var(--tag-bg-image); 
+                background-size: 100% 100% !important; /* Ép nền luôn hiển thị vừa khít khung */
+                background-position: center; 
+                background-repeat: no-repeat; 
+                page-break-inside: avoid; /* Tránh tình trạng in bị cắt nửa tag */
+            }
+            .tag-price { 
+                font-family: "Fira Sans", sans-serif; /* Bạn có thể đổi chữ Arial thành "Times New Roman" hoặc "Calibri" cho giống hệt file doc */
+                font-size: calc(var(--tag-font-size) + 42px); 
+                font-weight: bold; /* In đậm chuẩn */
+                color: #000; 
+                line-height: 1; 
+            }
+            .tag-name { 
+                font-family: "Fira Sans", sans-serif;
+                font-size: var(--tag-font-size); 
+                font-weight: normal; /* In thường (không đậm). Nếu muốn đậm toàn bộ thì đổi thành bold */
+                text-align: center; 
+                color: #000;
+                margin-top: 5px;
+            }
         }
     </style>
 </head>
 <body>
 
     <div class="top-bar">
-        <span>FR-021: System Health</span>
+        <span>System Heath</span>
         <div>
             <span id="sys-db">🟠 DB: Đang tải...</span> | 
             <span id="sys-printer">🟢 Máy in: OK</span>
@@ -78,11 +108,14 @@
                 <button class="btn btn-save" style="background:#8b5cf6;" onclick="uploadTemplate()">Đổi Ảnh Nền</button>
             </div>
             <div class="form-group">
-                <label>Rộng(mm)</label><input type="number" id="cfg-width">
-                <label>Cao(mm)</label><input type="number" id="cfg-height">
-                <label>Khoảng Cách(mm)</label><input type="number" id="cfg-gap">
-                <label>Cỡ Chữ SP (px)</label><input type="number" id="cfg-font">
-                <button class="btn btn-save" onclick="saveSettings()">Lưu</button>
+                <label>Kích thước In</label>
+                <select id="cfg-size">
+                    <option value="small">Tag Nhỏ (7.3cm x 4cm)</option>
+                    <option value="large">Tag Lớn (10cm x 6.9cm)</option>
+                </select>
+                <label style="margin-top: 10px;">Cỡ Chữ Tên SP (px)</label>
+                <input type="number" id="cfg-font" value="13">
+                <button class="btn btn-save" onclick="saveSettings()">Lưu Cấu Hình</button>
             </div>
         </div>
 
@@ -123,7 +156,6 @@
             checkSystemHealth();
         });
 
-        // FR-021: Đèn báo sức khỏe "sống"
         async function checkSystemHealth() {
             try {
                 const res = await fetch('/api/health');
@@ -139,7 +171,7 @@
                 document.getElementById('sys-db').innerText = `🔴 Mất kết nối Server`;
             }
         }
-        setInterval(checkSystemHealth, 3000); // Check mỗi 3 giây
+        setInterval(checkSystemHealth, 3000); 
 
         const quickSearchInput = document.getElementById('quick-search-input');
         const quickSearchResults = document.getElementById('quick-search-results');
@@ -176,26 +208,36 @@
             try {
                 const res = await fetch('/api/settings');
                 const cfg = await res.json();
-                document.getElementById('cfg-width').value = cfg.width || 65; document.getElementById('cfg-height').value = cfg.height || 35;
-                document.getElementById('cfg-gap').value = cfg.gap || 5; document.getElementById('cfg-font').value = cfg.font || 13;
+                document.getElementById('cfg-size').value = cfg.size || 'small'; 
+                document.getElementById('cfg-font').value = cfg.font || 13;
                 applyConfigToCSS(cfg);
             } catch (err) {}
         }
 
         async function saveSettings() {
             const cfg = {
-                width: document.getElementById('cfg-width').value, height: document.getElementById('cfg-height').value,
-                gap: document.getElementById('cfg-gap').value, font: document.getElementById('cfg-font').value,
+                size: document.getElementById('cfg-size').value, 
+                font: document.getElementById('cfg-font').value,
                 bgUrl: document.documentElement.style.getPropertyValue('--tag-bg-image').replace(/url\((['"])?(.*?)\1\)/gi, '$2') || null
             };
             await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
-            applyConfigToCSS(cfg); alert("Đã lưu cấu hình vào máy chủ!");
+            applyConfigToCSS(cfg); 
+            alert("Đã lưu kích thước và cấu hình!");
         }
 
         function applyConfigToCSS(cfg) {
             const root = document.documentElement;
-            root.style.setProperty('--tag-width', (cfg.width || 65) + 'mm'); root.style.setProperty('--tag-height', (cfg.height || 35) + 'mm');
-            root.style.setProperty('--tag-gap', (cfg.gap || 5) + 'mm'); root.style.setProperty('--tag-font-size', (cfg.font || 13) + 'px');
+            // Map kích thước dựa trên lựa chọn dropdown
+            if(cfg.size === 'large') {
+                root.style.setProperty('--tag-width', '100mm'); 
+                root.style.setProperty('--tag-height', '69mm');
+            } else {
+                root.style.setProperty('--tag-width', '73mm'); 
+                root.style.setProperty('--tag-height', '40mm');
+            }
+            
+            root.style.setProperty('--tag-gap', '5mm'); 
+            root.style.setProperty('--tag-font-size', (cfg.font || 13) + 'px');
             if(cfg.bgUrl && cfg.bgUrl !== 'none') root.style.setProperty('--tag-bg-image', `url(${cfg.bgUrl})`);
         }
 
@@ -230,12 +272,11 @@
 
                 document.getElementById('count-error').innerText = data.error.length;
                 
-                // FR-017: Hiển thị tên gợi ý nếu Trạm 1 có gõ
                 document.getElementById('list-error').innerHTML = data.error.map(p => {
-                    const suggestText = p.suggestedName ? `<br><small style="color:#2563eb;">💡 Gợi ý: ${p.suggestedName}</small>` : '';
+                    const suggestText = p.suggestedName ? `<br><small style="color:#2563eb;">Gợi ý: ${p.suggestedName}</small>` : '';
                     return `<div class="item">
                         <span>⚠️ <b>${p.barcode}</b> ${suggestText}</span> 
-                        <div><button class="btn btn-fix" onclick="openModal(${p.id}, '${p.barcode}')">✏️ Sửa</button> <button class="btn btn-del" onclick="removeItem(${p.id}, 'error')">X</button></div>
+                        <div><button class="btn btn-fix" onclick="openModal(${p.id}, '${p.barcode}')">Sửa</button> <button class="btn btn-del" onclick="removeItem(${p.id}, 'error')">X</button></div>
                     </div>`;
                 }).join('');
             } catch (error) {}
@@ -252,7 +293,7 @@
 
         function printTags() {
             if(currentMatchedList.length === 0) return alert("Không có gì để in!");
-            document.getElementById('render-print-tags').innerHTML = currentMatchedList.map(p => `<div class="tag-box"><div class="tag-price">${p.ticket}đ</div><div class="tag-name">${p.tenSp}</div></div>`).join('');
+            document.getElementById('render-print-tags').innerHTML = currentMatchedList.map(p => `<div class="tag-box"><div class="tag-price">${p.ticket}</div><div class="tag-name">${p.tenSp}</div></div>`).join('');
             window.print();
         }
         
