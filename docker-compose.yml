@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  tag-printer:
+    build: .
+    container_name: tag_print
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data:Z
+      - ./config:/app/config:Z
+      - ./templates:/app/templates:Z
+      - ./public:/app/public:Z
+    restart: always

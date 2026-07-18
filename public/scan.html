@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trạm Quét Mã (Trạm 1)</title>
+    <style>
+        body { 
+            margin: 0; padding: 0; font-family: Arial, sans-serif; 
+            height: 100vh; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; 
+            background-color: #f3f4f6; transition: background-color 0.3s;
+        }
+        /* Màn hình chớp màu */
+        body.success { background-color: #22c55e; } 
+        body.error { background-color: #ef4444; } 
+        body.offline { background-color: #f59e0b; } 
+
+        .input-box {
+            width: 80%; max-width: 600px; padding: 20px; 
+            font-size: 32px; text-align: center; 
+            border: 4px solid #3b82f6; border-radius: 15px; outline: none;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+        
+        /* Trạng thái mạng */
+        .system-health {
+            position: absolute; top: 20px; right: 20px;
+            background: white; padding: 10px 20px; border-radius: 30px;
+            font-weight: bold; box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status-dot { color: #22c55e; }
+        .status-dot.offline { color: #ef4444; }
+    </style>
+</head>
+<body>
+
+    <div class="system-health" id="health-bar">
+        <span class="status-dot" id="network-dot">🟢</span> Kết nối Máy 2
+    </div>
+
+    <div id="scan-container" style="text-align: center; width: 100%;">
+        <h1 style="color: #1f2937;">TRẠM QUÉT MÃ</h1>
+        <p style="color: #6b7280; font-size: 18px;">Vui lòng dùng súng quét mã vạch</p>
+        <input type="text" id="barcode-input" class="input-box" placeholder="Đang chờ quét..." autocomplete="off" autofocus>
+    </div>
+
+    <script>
+        const input = document.getElementById('barcode-input');
+        const networkDot = document.getElementById('network-dot');
+        let isOnline = true;
+
+        // Tự động focus lại vào ô nhập liệu nếu lỡ click chuột ra ngoài
+        document.addEventListener('click', () => input.focus());
+
+        // Kiểm tra kết nối với Trạm 2 mỗi 3 giây
+        setInterval(async () => {
+            try {
+                await fetch('/api/health');
+                if(!isOnline) { 
+                    isOnline = true; networkDot.innerText = '🟢'; 
+                    document.body.classList.remove('offline'); 
+                }
+            } catch (e) {
+                isOnline = false; networkDot.innerText = '🔴'; 
+                document.body.classList.add('offline');
+            }
+        }, 3000);
+
+        // Lắng nghe tiếng "Bíp" (phím Enter) từ súng quét
+        input.addEventListener('keypress', async function(e) {
+            if (e.key === 'Enter') {
+                const barcode = this.value.trim();
+                if (!barcode) return;
+                
+                this.value = ''; // Xóa trắng ô ngay lập tức để chờ mã tiếp theo
+                sendBarcode(barcode);
+            }
+        });
+
+        // Gửi mã thẳng lên Server
+        async function sendBarcode(barcode) {
+            try {
+                const res = await fetch('/api/scan', {
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ barcode })
+                });
+                const data = await res.json();
+                
+                if(data.success) {
+                    flashScreen('success'); // Đúng mã -> Chớp xanh
+                } else {
+                    flashScreen('error');   // Sai mã -> Chớp đỏ
+                }
+            } catch (error) { 
+                flashScreen('error'); 
+                console.error("Lỗi mạng LAN!"); 
+            }
+        }
+
+        // Hiệu ứng chớp màn hình rồi trả về bình thường cực nhanh
+        function flashScreen(type) {
+            document.body.classList.add(type);
+            setTimeout(() => document.body.classList.remove(type), 400);
+        }
+    </script>
+</body>
+</html>

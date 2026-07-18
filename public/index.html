@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quản Lý In Ấn</title>
+    <style>
+        :root { --tag-width: 65mm; --tag-height: 35mm; --tag-gap: 5mm; --tag-font-size: 13px; --tag-bg-image: none; }
+        body { font-family: Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; }
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; font-size: 14px; color: #4b5563; font-weight: bold;}
+        .header { display: flex; justify-content: space-between; align-items: center; background: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        .btn { padding: 8px 15px; font-size: 14px; border: none; border-radius: 5px; cursor: pointer; color: white; font-weight: bold; margin-left: 5px; }
+        .btn-print { background-color: #2563eb; padding: 10px 20px; font-size: 16px;}
+        .btn-clear { background-color: #dc2626; padding: 10px 20px; font-size: 16px;}
+        .btn-fix { background-color: #eab308; } 
+        .btn-del { background-color: #ef4444; padding: 4px 8px; font-size: 12px;} 
+        .btn-save { background-color: #10b981; width: 100%; margin-left:0; margin-top:10px; padding: 10px;}
+        .main-layout { display: flex; gap: 20px; }
+        .column { flex: 1; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); min-height: 400px; max-height: 70vh; overflow-y: auto;}
+        .col-success h2 { color: #16a34a; border-bottom: 2px solid #16a34a; padding-bottom: 10px; margin-top:0;}
+        .col-error h2 { color: #dc2626; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-top:0;}
+        .config-panel { width: 300px; background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-height: 70vh; overflow-y: auto;}
+        .config-panel h3 { margin-top: 0; color: #1f2937;}
+        .form-group { margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 5px; border: 1px solid #e2e8f0; }
+        .form-group label { display: block; font-size: 13px; font-weight: bold; margin-bottom: 5px;}
+        .form-group input, .form-group select { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 4px;}
+        .item { padding: 10px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center;}
+        
+        #quick-search-input { width: 100%; padding: 10px; box-sizing: border-box; font-size: 14px; border: 2px solid #10b981; border-radius: 5px; outline: none; margin-bottom: 15px;}
+        #quick-search-results { position: absolute; width: 100%; background: white; border: 1px solid #ccc; max-height: 250px; overflow-y: auto; z-index: 100; border-radius: 4px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: none; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; }
+        .modal-content { background: white; padding: 20px; border-radius: 8px; width: 500px; max-width: 90%; }
+        #search-input { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; font-size: 16px; border: 2px solid #3b82f6; border-radius: 5px; outline: none; }
+        .search-result-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center;}
+        .search-result-item:hover { background-color: #f3f4f6; }
+        
+        #print-area { display: none; }
+        @media print {
+            body * { visibility: hidden; }
+            #print-area, #print-area * { visibility: visible; }
+            #print-area { display: block; position: absolute; left: 0; top: 0; width: 210mm; }
+            .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--tag-width)); gap: var(--tag-gap); padding: 10mm; justify-content: center; }
+            .tag-box { border: 1px dashed #ccc; width: var(--tag-width); height: var(--tag-height); box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; overflow: hidden; padding: 10px; background-image: var(--tag-bg-image); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+            .tag-price { font-size: calc(var(--tag-font-size) + 12px); font-weight: 900; color: #000; line-height: 1; text-shadow: 1px 1px 2px rgba(255,255,255,0.9);}
+            .tag-name { font-size: var(--tag-font-size); font-weight: bold; text-align: center; text-shadow: 1px 1px 2px rgba(255,255,255,0.9);}
+        }
+    </style>
+</head>
+<body>
+
+    <div class="top-bar">
+        <span>FR-021: System Health</span>
+        <div>
+            <span id="sys-db">🟠 DB: Đang tải...</span> | 
+            <span id="sys-printer">🟢 Máy in: OK</span>
+        </div>
+    </div>
+
+    <div class="header">
+        <h1>Dashboard Trạm 2</h1>
+        <div>
+            <button class="btn btn-clear" onclick="clearQueue()">Xóa hết</button>
+            <button class="btn btn-print" onclick="printTags()">IN TAG</button>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <div class="config-panel">
+            <h3>Quản Lý Cấu Hình</h3>
+            <div class="form-group">
+                <label>Nạp dữ liệu Excel (.xlsx)</label>
+                <input type="file" id="excel-upload" accept=".xlsx" multiple>
+                <button class="btn btn-save" style="background:#3b82f6;" onclick="uploadExcel()">Upload</button>
+            </div>
+            <div class="form-group">
+                <label>Ảnh Nền Tag (.png, .jpg)</label>
+                <input type="file" id="bg-upload" accept="image/*">
+                <button class="btn btn-save" style="background:#8b5cf6;" onclick="uploadTemplate()">Đổi Ảnh Nền</button>
+            </div>
+            <div class="form-group">
+                <label>Rộng(mm)</label><input type="number" id="cfg-width">
+                <label>Cao(mm)</label><input type="number" id="cfg-height">
+                <label>Khoảng Cách(mm)</label><input type="number" id="cfg-gap">
+                <label>Cỡ Chữ SP (px)</label><input type="number" id="cfg-font">
+                <button class="btn btn-save" onclick="saveSettings()">Lưu</button>
+            </div>
+        </div>
+
+        <div class="column col-success">
+            <h2>Chờ In (<span id="count-matched">0</span>)</h2>
+            <div style="position: relative;">
+                <input type="text" id="quick-search-input" placeholder="Gõ tên hoặc mã SP" autocomplete="off">
+                <div id="quick-search-results"></div>
+            </div>
+            <div id="list-matched"></div>
+        </div>
+
+        <div class="column col-error">
+            <h2>Mã Lỗi (<span id="count-error">0</span>)</h2>
+            <div id="list-error"></div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="search-modal">
+        <div class="modal-content">
+            <h3>Sửa tay mã: <span id="error-barcode-label" style="color:red;"></span></h3>
+            <input type="text" id="search-input" placeholder="Gõ tên hoặc mã SP..." autocomplete="off">
+            <div id="search-results" style="max-height: 250px; overflow-y: auto; margin-top: 10px;"></div>
+            <button class="btn" style="background: #6b7280; float:right; margin-top: 10px;" onclick="closeModal()">Đóng</button>
+            <div style="clear:both;"></div>
+        </div>
+    </div>
+
+    <div id="print-area"><div class="tag-grid" id="render-print-tags"></div></div>
+
+    <script>
+        let currentMatchedList = [];
+        let resolvingErrorId = null; 
+
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadSettings();
+            fetchQueue();
+            checkSystemHealth();
+        });
+
+        // FR-021: Đèn báo sức khỏe "sống"
+        async function checkSystemHealth() {
+            try {
+                const res = await fetch('/api/health');
+                const data = await res.json();
+                const dbLabel = document.getElementById('sys-db');
+                
+                if(data.dbCount > 0) {
+                    dbLabel.innerText = `🟢 DB: Có ${data.dbCount} SP`;
+                } else {
+                    dbLabel.innerText = `🔴 DB: Trống`;
+                }
+            } catch (err) {
+                document.getElementById('sys-db').innerText = `🔴 Mất kết nối Server`;
+            }
+        }
+        setInterval(checkSystemHealth, 3000); // Check mỗi 3 giây
+
+        const quickSearchInput = document.getElementById('quick-search-input');
+        const quickSearchResults = document.getElementById('quick-search-results');
+
+        quickSearchInput.addEventListener('input', async (e) => {
+            const keyword = e.target.value.trim();
+            if(keyword.length < 2) { quickSearchResults.style.display = 'none'; return; }
+            try {
+                const res = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
+                const results = await res.json();
+                if(results.length > 0) {
+                    quickSearchResults.innerHTML = results.map(p => `
+                        <div class="search-result-item" onclick="quickAddProduct('${p.barcode}')">
+                            <div><b>${p.tenSp}</b><br><small>Mã: ${p.barcode}</small></div>
+                            <div style="font-weight:bold; color:#10b981">${p.ticket}đ</div>
+                        </div>`).join('');
+                    quickSearchResults.style.display = 'block';
+                } else { quickSearchResults.style.display = 'none'; }
+            } catch (err) {}
+        });
+
+        document.addEventListener('click', (e) => {
+            if(!e.target.closest('#quick-search-input') && !e.target.closest('#quick-search-results')) {
+                quickSearchResults.style.display = 'none';
+            }
+        });
+
+        async function quickAddProduct(barcode) {
+            await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ barcode: barcode }) });
+            quickSearchInput.value = ''; quickSearchResults.style.display = 'none'; fetchQueue();
+        }
+
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const cfg = await res.json();
+                document.getElementById('cfg-width').value = cfg.width || 65; document.getElementById('cfg-height').value = cfg.height || 35;
+                document.getElementById('cfg-gap').value = cfg.gap || 5; document.getElementById('cfg-font').value = cfg.font || 13;
+                applyConfigToCSS(cfg);
+            } catch (err) {}
+        }
+
+        async function saveSettings() {
+            const cfg = {
+                width: document.getElementById('cfg-width').value, height: document.getElementById('cfg-height').value,
+                gap: document.getElementById('cfg-gap').value, font: document.getElementById('cfg-font').value,
+                bgUrl: document.documentElement.style.getPropertyValue('--tag-bg-image').replace(/url\((['"])?(.*?)\1\)/gi, '$2') || null
+            };
+            await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) });
+            applyConfigToCSS(cfg); alert("Đã lưu cấu hình vào máy chủ!");
+        }
+
+        function applyConfigToCSS(cfg) {
+            const root = document.documentElement;
+            root.style.setProperty('--tag-width', (cfg.width || 65) + 'mm'); root.style.setProperty('--tag-height', (cfg.height || 35) + 'mm');
+            root.style.setProperty('--tag-gap', (cfg.gap || 5) + 'mm'); root.style.setProperty('--tag-font-size', (cfg.font || 13) + 'px');
+            if(cfg.bgUrl && cfg.bgUrl !== 'none') root.style.setProperty('--tag-bg-image', `url(${cfg.bgUrl})`);
+        }
+
+        async function uploadExcel() {
+            const fileInput = document.getElementById('excel-upload');
+            if (fileInput.files.length === 0) return alert("Vui lòng chọn file Excel!");
+            const formData = new FormData(); for (const file of fileInput.files) formData.append('files', file);
+            const res = await fetch('/api/upload-excel', { method: 'POST', body: formData });
+            const data = await res.json(); alert(data.message + ` (Tổng: ${data.total} SP)`);
+            fileInput.value = ''; checkSystemHealth();
+        }
+
+        async function uploadTemplate() {
+            const fileInput = document.getElementById('bg-upload');
+            if (fileInput.files.length === 0) return;
+            const formData = new FormData(); formData.append('image', fileInput.files[0]);
+            const res = await fetch('/api/upload-template', { method: 'POST', body: formData });
+            const data = await res.json(); document.documentElement.style.setProperty('--tag-bg-image', `url(${data.imageUrl})`);
+            saveSettings(); fileInput.value = '';
+        }
+
+        async function fetchQueue() {
+            try {
+                const res = await fetch('/api/queue');
+                const data = await res.json();
+                currentMatchedList = data.matched;
+                
+                document.getElementById('count-matched').innerText = data.matched.length;
+                document.getElementById('list-matched').innerHTML = data.matched.map(p => 
+                    `<div class="item"><span>${p.barcode} - <b>${p.tenSp}</b><br><small>${p.ticket}đ</small></span> <button class="btn btn-del" onclick="removeItem(${p.id}, 'matched')">X</button></div>`
+                ).join('');
+
+                document.getElementById('count-error').innerText = data.error.length;
+                
+                // FR-017: Hiển thị tên gợi ý nếu Trạm 1 có gõ
+                document.getElementById('list-error').innerHTML = data.error.map(p => {
+                    const suggestText = p.suggestedName ? `<br><small style="color:#2563eb;">💡 Gợi ý: ${p.suggestedName}</small>` : '';
+                    return `<div class="item">
+                        <span>⚠️ <b>${p.barcode}</b> ${suggestText}</span> 
+                        <div><button class="btn btn-fix" onclick="openModal(${p.id}, '${p.barcode}')">✏️ Sửa</button> <button class="btn btn-del" onclick="removeItem(${p.id}, 'error')">X</button></div>
+                    </div>`;
+                }).join('');
+            } catch (error) {}
+        }
+        setInterval(fetchQueue, 2000);
+
+        async function clearQueue() {
+            if(confirm("Xóa sạch danh sách?")) { await fetch('/api/clear-queue', { method: 'POST' }); fetchQueue(); }
+        }
+
+        async function removeItem(id, type) {
+            await fetch('/api/remove-item', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({id, type}) }); fetchQueue();
+        }
+
+        function printTags() {
+            if(currentMatchedList.length === 0) return alert("Không có gì để in!");
+            document.getElementById('render-print-tags').innerHTML = currentMatchedList.map(p => `<div class="tag-box"><div class="tag-price">${p.ticket}đ</div><div class="tag-name">${p.tenSp}</div></div>`).join('');
+            window.print();
+        }
+        
+        window.addEventListener('afterprint', async () => {
+            if(confirm("Máy in đã nhận lệnh. Bạn có muốn xóa danh sách vừa in không?")) { await fetch('/api/clear-queue', { method: 'POST' }); fetchQueue(); }
+        });
+
+        function openModal(errorId, wrongBarcode) {
+            resolvingErrorId = errorId; document.getElementById('error-barcode-label').innerText = wrongBarcode;
+            document.getElementById('search-modal').style.display = 'flex'; document.getElementById('search-results').innerHTML = '';
+            document.getElementById('search-input').focus();
+        }
+        function closeModal() { document.getElementById('search-modal').style.display = 'none'; }
+
+        document.getElementById('search-input').addEventListener('input', async (e) => {
+            const keyword = e.target.value.trim();
+            if(keyword.length < 2) return document.getElementById('search-results').innerHTML = '';
+            const res = await fetch(`/api/search?q=${encodeURIComponent(keyword)}`);
+            const results = await res.json();
+            document.getElementById('search-results').innerHTML = results.map(p => `
+                <div class="search-result-item" onclick="resolveError('${p.barcode}')">
+                    <div><b>${p.tenSp}</b><br><small>Mã: ${p.barcode}</small></div>
+                    <div style="font-weight:bold;">${p.ticket}đ</div>
+                </div>`).join('');
+        });
+
+        async function resolveError(correctBarcode) {
+            await fetch('/api/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ errorId: resolvingErrorId, correctBarcode: correctBarcode }) });
+            closeModal(); fetchQueue(); 
+        }
+    </script>
+</body>
+</html>
