@@ -45,35 +45,39 @@
                 width: var(--tag-width); 
                 height: var(--tag-height); 
                 box-sizing: border-box; 
+                
+                /* TẠO KHUNG CĂN CHỈNH */
                 display: flex; 
                 flex-direction: column; 
-                justify-content: center; 
+                justify-content: center; /* Ép nội dung vào chính giữa */
                 align-items: center; 
-                gap: 5px; 
+                
+                /* ĐIỂM MẤU CHỐT: Đẩy lề trên và dưới để né 2 dải màu đỏ */
+                padding-top: 24%;    /* Đẩy chữ tránh dải đỏ TIMEZONE ở trên */
+                padding-bottom: 24%; /* Đẩy chữ tránh dải đỏ TIZUI ở dưới */
+                padding-left: 5px;
+                padding-right: 5px;
+
                 overflow: hidden; 
-                padding: 10px; 
                 background-image: var(--tag-bg-image); 
-                background-size: 100% 100% !important; /* Ép nền luôn hiển thị vừa khít khung */
+                background-size: 100% 100% !important; 
                 background-position: center; 
                 background-repeat: no-repeat; 
-                page-break-inside: avoid; /* Tránh tình trạng in bị cắt nửa tag */
+                page-break-inside: avoid; 
             }
-            .tag-price { 
-                font-family: "Fira Sans", sans-serif; /* Bạn có thể đổi chữ Arial thành "Times New Roman" hoặc "Calibri" cho giống hệt file doc */
-                font-size: calc(var(--tag-font-size) + 42px); 
-                font-weight: bold; /* In đậm chuẩn */
-                color: #000; 
-                line-height: 1; 
+
+            .tag-info {
+                /* Bỏ nền trắng bo góc đi để chữ in trực tiếp lên nền vàng */
+                background-color: transparent; 
+                width: 100%; 
+                height: 100%; /* Chiếm trọn không gian (đã bị ép lại bởi padding ở trên) */
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center; /* Tự động chia đều khoảng cách giữa Tên và Giá */
+                gap: 5px;
             }
-            .tag-name { 
-                font-family: "Fira Sans", sans-serif;
-                font-size: var(--tag-font-size); 
-                font-weight: normal; /* In thường (không đậm). Nếu muốn đậm toàn bộ thì đổi thành bold */
-                text-align: center; 
-                color: #000;
-                margin-top: 5px;
-            }
-        }
+    }
     </style>
 </head>
 <body>
