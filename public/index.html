@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Sans:wght@800&display=swap" rel="stylesheet">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Quản Lý In Ấn</title>
@@ -49,12 +50,12 @@
                 /* TẠO KHUNG CĂN CHỈNH */
                 display: flex; 
                 flex-direction: column; 
-                justify-content: center; /* Ép nội dung vào chính giữa */
+                justify-content: center; 
                 align-items: center; 
                 
-                /* ĐIỂM MẤU CHỐT: Đẩy lề trên và dưới để né 2 dải màu đỏ */
-                padding-top: 24%;    /* Đẩy chữ tránh dải đỏ TIMEZONE ở trên */
-                padding-bottom: 24%; /* Đẩy chữ tránh dải đỏ TIZUI ở dưới */
+                /* Đẩy lề trên và dưới để né 2 dải màu đỏ */
+                padding-top: 24%;    
+                padding-bottom: 24%; 
                 padding-left: 5px;
                 padding-right: 5px;
 
@@ -67,17 +68,40 @@
             }
 
             .tag-info {
-                /* Bỏ nền trắng bo góc đi để chữ in trực tiếp lên nền vàng */
                 background-color: transparent; 
                 width: 100%; 
-                height: 100%; /* Chiếm trọn không gian (đã bị ép lại bởi padding ở trên) */
+                height: 100%; 
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                justify-content: center; /* Tự động chia đều khoảng cách giữa Tên và Giá */
-                gap: 5px;
+                justify-content: center; 
+                gap: 0.8em;
+                
+                font-family: 'Fira Sans', sans-serif;
+                color: #000;
             }
-    }
+
+            /* XỬ LÝ CHỮ GIÁ (TICKET) */
+            .tag-price {
+                font-size: calc(var(--tag-font-size) * 3); 
+                line-height: 1;
+                margin: 0;
+                letter-spacing: 1px;
+                font-weight: 900; /* Mức độ dày cao nhất của font chữ */
+                -webkit-text-stroke: 1.5px black; /* Đắp thêm 2px viền đen xung quanh nét chữ */
+            }
+
+            /* XỬ LÝ CHỮ TÊN SẢN PHẨM */
+            .tag-name {
+                font-size: var(--tag-font-size); 
+                line-height: 1.2;
+                text-align: center;
+                letter-spacing: 0.25px;
+                margin: 0;
+                font-weight: bold; /* In đậm chữ nhỏ */
+                -webkit-text-stroke: 0.4px black; /* Đắp thêm nửa px viền đen (để chữ nhỏ không bị dính nét vào nhau) */
+            }
+        }
     </style>
 </head>
 <body>
@@ -91,7 +115,7 @@
     </div>
 
     <div class="header">
-        <h1>Dashboard Trạm 2</h1>
+        <h1>Khu vực in</h1>
         <div>
             <button class="btn btn-clear" onclick="clearQueue()">Xóa hết</button>
             <button class="btn btn-print" onclick="printTags()">IN TAG</button>
