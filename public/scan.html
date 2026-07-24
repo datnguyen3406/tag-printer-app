@@ -75,22 +75,23 @@
             }, 2500); // Tự động reset màu sau 2.5 giây
         }
 
-        // Khởi tạo Camera
+        // Khởi tạo Camera (Đã tối ưu cho Safari)
         const html5QrcodeScanner = new Html5QrcodeScanner(
             "reader",
             { 
-                fps: 10, // Quét 10 khung hình/giây
-                qrbox: {width: 250, height: 100}, // Vẽ cái khung hình chữ nhật vừa với mã vạch
-                aspectRatio: 1.0 
+                fps: 10, 
+                qrbox: {width: 250, height: 100}, 
+                // ĐIỂM SỬA 1: Bỏ dòng aspectRatio: 1.0 đi vì Safari trên iOS rất hay bị lỗi ép khung hình video
+                // ĐIỂM SỬA 2: Ép trình duyệt phải gọi thẳng vào Camera sau của điện thoại
+                videoConstraints: { facingMode: "environment" } 
             },
             /* verbose= */ false
         );
 
         // Chạy khi Camera bắt được mã
         function onScanSuccess(decodedText, decodedResult) {
-            if (isScanningPaused) return; // Nếu đang tạm dừng thì bỏ qua
+            if (isScanningPaused) return; 
             
-            // Tạm dừng camera 2 giây để tránh việc nó bắn 10 lệnh/giây cho cùng 1 cái mã
             isScanningPaused = true; 
             sendBarcodeToServer(decodedText);
             
@@ -99,7 +100,10 @@
             }, 2000);
         }
 
-        html5QrcodeScanner.render(onScanSuccess);
+        // ĐIỂM SỬA 3: Bổ sung function(error) rỗng để chặn Safari báo lỗi ngầm liên tục khi khung hình chưa có mã vạch
+        html5QrcodeScanner.render(onScanSuccess, function(errorMessage) {
+            // Không làm gì cả
+        });
 
         // Xử lý gửi mã bằng nút nhập tay
         function sendManualCode() {

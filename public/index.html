@@ -40,7 +40,7 @@
             body * { visibility: hidden; }
             #print-area, #print-area * { visibility: visible; }
             #print-area { display: block; position: absolute; left: 0; top: 0; width: 210mm; }
-            .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--tag-width)); gap: var(--tag-gap); padding: 10mm; justify-content: center; }
+            .tag-grid { display: grid; grid-template-columns: repeat(auto-fill, var(--tag-width)); gap: var(--tag-gap); padding: 0.2mm; justify-content: center; gap: 0.1px }
             .tag-box { 
                 border: 1px dashed #ccc; 
                 width: var(--tag-width); 
@@ -94,9 +94,9 @@
             /* XỬ LÝ CHỮ TÊN SẢN PHẨM */
             .tag-name {
                 font-size: var(--tag-font-size); 
-                line-height: 1.2;
+                line-height: 1.5;
                 text-align: center;
-                letter-spacing: 0.25px;
+                letter-spacing: 0.5px;
                 margin: 0;
                 font-weight: bold; /* In đậm chữ nhỏ */
                 -webkit-text-stroke: 0.4px black; /* Đắp thêm nửa px viền đen (để chữ nhỏ không bị dính nét vào nhau) */
