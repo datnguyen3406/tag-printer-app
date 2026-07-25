@@ -79,8 +79,8 @@
         const html5QrcodeScanner = new Html5QrcodeScanner(
             "reader",
             { 
-                fps: 10, 
-                qrbox: {width: 250, height: 100}, 
+                fps: 20, 
+                qrbox: {width: 300, height: 150}, 
                 // ĐIỂM SỬA 1: Bỏ dòng aspectRatio: 1.0 đi vì Safari trên iOS rất hay bị lỗi ép khung hình video
                 // ĐIỂM SỬA 2: Ép trình duyệt phải gọi thẳng vào Camera sau của điện thoại
                 videoConstraints: { facingMode: "environment" } 
