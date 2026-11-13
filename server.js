@@ -127,7 +127,7 @@ const loadExcelToRAM = () => {
     console.log("Tổng:", Object.keys(masterDictionary).length);
 
 };
-loadExcelToRAM;
+loadExcelToRAM();
 
 const excelStorage = multer.diskStorage({
     destination: (req, file, cb) => cb(null, 'data/'),
@@ -140,6 +140,21 @@ const templateStorage = multer.diskStorage({
     filename: (req, file, cb) => cb(null, 'bg-' + Date.now() + path.extname(file.originalname))
 });
 const uploadTemplate = multer({ storage: templateStorage });
+
+const errorStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, 'public', 'uploads', 'errors');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => cb(null, 'err-' + Date.now() + '.jpg')
+});
+const uploadError = multer({ storage: errorStorage });
+
+// --- Màn hình Trạm 1 (Scan Camera trên điện thoại) ---
+app.get('/scan', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'scan.html'));
+});
 
 // --- [FR-021] API Kiểm tra sức khỏe hệ thống ---
 app.get('/api/health', (req, res) => {
@@ -188,6 +203,21 @@ app.post('/api/scan', (req, res) => {
         }
         res.status(200).json({ success: false, message: "Lỗi mã" });
     }
+});
+
+// --- Nhận ảnh báo lỗi / không quét được từ Trạm 1 ---
+app.post('/api/report-error', uploadError.single('image'), (req, res) => {
+    const imageUrl = req.file ? `/uploads/errors/${req.file.filename}` : '';
+    const note = (req.body.note || '').trim();
+    const errorItem = {
+        id: Date.now(),
+        barcode: req.body.barcode || '⚠️ Không đọc được (Có ảnh)',
+        imageUrl: imageUrl,
+        suggestedName: note,
+        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    };
+    printQueue.error.unshift(errorItem); // Đưa lên đầu danh sách lỗi
+    res.json({ success: true, message: "Đã báo lỗi và gửi ảnh thành công!", item: errorItem });
 });
 
 app.get('/api/queue', (req, res) => res.json(printQueue));

@@ -35,6 +35,11 @@
         .search-result-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; display: flex; justify-content: space-between; align-items: center;}
         .search-result-item:hover { background-color: #f3f4f6; }
         
+        .err-item-content { display: flex; align-items: center; gap: 10px; }
+        .err-thumb { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid #f87171; flex-shrink: 0; transition: transform 0.2s; }
+        .err-thumb:hover { transform: scale(1.08); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
+        .modal-img-preview { width: 100%; max-height: 220px; object-fit: contain; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e5e7eb; background: #111; }
+        
         #print-area { display: none; }
         @media print {
             body * { visibility: hidden; }
@@ -109,6 +114,7 @@
     <div class="top-bar">
         <span>System Heath</span>
         <div>
+            <a href="/scan" target="_blank" style="color: #2563eb; text-decoration: none; font-weight: bold; margin-right: 15px;">📱 Mở Trạm Quét Camera (/scan)</a>
             <span id="sys-db">🟠 DB: Đang tải...</span> | 
             <span id="sys-printer">🟢 Máy in: OK</span>
         </div>
@@ -164,11 +170,24 @@
 
     <div class="modal-overlay" id="search-modal">
         <div class="modal-content">
-            <h3>Sửa tay mã: <span id="error-barcode-label" style="color:red;"></span></h3>
-            <input type="text" id="search-input" placeholder="Gõ tên hoặc mã SP..." autocomplete="off">
+            <h3>Sửa mã / Gán sản phẩm: <span id="error-barcode-label" style="color:red;"></span></h3>
+            <img id="modal-error-img" class="modal-img-preview" style="display:none;" alt="Ảnh sản phẩm lỗi">
+            <input type="text" id="search-input" placeholder="Gõ tên hoặc mã SP để gán..." autocomplete="off">
             <div id="search-results" style="max-height: 250px; overflow-y: auto; margin-top: 10px;"></div>
             <button class="btn" style="background: #6b7280; float:right; margin-top: 10px;" onclick="closeModal()">Đóng</button>
             <div style="clear:both;"></div>
+        </div>
+    </div>
+
+    <!-- Modal Phóng To Ảnh Lỗi Cho Quản Lý -->
+    <div class="modal-overlay" id="lightbox-modal" onclick="closeLightbox()">
+        <div class="modal-content" style="max-width: 90%; width: 650px; text-align: center; background: #1f2937; color: white;" onclick="event.stopPropagation()">
+            <h3 style="margin-top:0;">Ảnh Chụp Từ Trạm Quét</h3>
+            <img id="lightbox-img" style="max-width: 100%; max-height: 70vh; border-radius: 8px; object-fit: contain;">
+            <div style="margin-top: 12px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-fix" id="lightbox-btn-fix" onclick="proceedFixFromLightbox()">🔍 Tìm & Gán Mã</button>
+                <button class="btn btn-del" onclick="closeLightbox()">Đóng</button>
+            </div>
         </div>
     </div>
 
@@ -302,9 +321,20 @@
                 
                 document.getElementById('list-error').innerHTML = data.error.map(p => {
                     const suggestText = p.suggestedName ? `<br><small style="color:#2563eb;">Gợi ý: ${p.suggestedName}</small>` : '';
+                    const timeText = p.time ? `<small style="color:#6b7280; font-size:11px;"> [${p.time}]</small>` : '';
+                    const thumbHtml = p.imageUrl ? `<img src="${p.imageUrl}" class="err-thumb" title="Bấm xem ảnh to" onclick="previewImage('${p.imageUrl}', ${p.id}, '${p.barcode}')">` : '';
+                    
                     return `<div class="item">
-                        <span>⚠️ <b>${p.barcode}</b> ${suggestText}</span> 
-                        <div><button class="btn btn-fix" onclick="openModal(${p.id}, '${p.barcode}')">Sửa</button> <button class="btn btn-del" onclick="removeItem(${p.id}, 'error')">X</button></div>
+                        <div class="err-item-content">
+                            ${thumbHtml}
+                            <div>
+                                <span>⚠️ <b>${p.barcode}</b>${timeText}${suggestText}</span>
+                            </div>
+                        </div>
+                        <div>
+                            <button class="btn btn-fix" onclick="openModal(${p.id}, '${p.barcode}', '${p.imageUrl || ''}')">Sửa</button> 
+                            <button class="btn btn-del" onclick="removeItem(${p.id}, 'error')">X</button>
+                        </div>
                     </div>`;
                 }).join('');
             } catch (error) {}
@@ -329,9 +359,36 @@
             if(confirm("Máy in đã nhận lệnh. Bạn có muốn xóa danh sách vừa in không?")) { await fetch('/api/clear-queue', { method: 'POST' }); fetchQueue(); }
         });
 
-        function openModal(errorId, wrongBarcode) {
-            resolvingErrorId = errorId; document.getElementById('error-barcode-label').innerText = wrongBarcode;
-            document.getElementById('search-modal').style.display = 'flex'; document.getElementById('search-results').innerHTML = '';
+        let currentLightboxData = null;
+        function previewImage(imageUrl, id, barcode) {
+            currentLightboxData = { id, barcode, imageUrl };
+            document.getElementById('lightbox-img').src = imageUrl;
+            document.getElementById('lightbox-modal').style.display = 'flex';
+        }
+        function closeLightbox() {
+            document.getElementById('lightbox-modal').style.display = 'none';
+        }
+        function proceedFixFromLightbox() {
+            if (!currentLightboxData) return;
+            closeLightbox();
+            openModal(currentLightboxData.id, currentLightboxData.barcode, currentLightboxData.imageUrl);
+        }
+
+        function openModal(errorId, wrongBarcode, imageUrl = '') {
+            resolvingErrorId = errorId;
+            document.getElementById('error-barcode-label').innerText = wrongBarcode;
+            
+            const imgPreview = document.getElementById('modal-error-img');
+            if (imageUrl) {
+                imgPreview.src = imageUrl;
+                imgPreview.style.display = 'block';
+            } else {
+                imgPreview.style.display = 'none';
+            }
+
+            document.getElementById('search-modal').style.display = 'flex';
+            document.getElementById('search-results').innerHTML = '';
+            document.getElementById('search-input').value = '';
             document.getElementById('search-input').focus();
         }
         function closeModal() { document.getElementById('search-modal').style.display = 'none'; }

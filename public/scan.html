@@ -2,124 +2,547 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trạm Quét Mã</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Trạm Quét Mã (Trạm 1)</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#111827">
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); width: 100%; max-width: 500px; text-align: center; }
-        h1 { font-size: 20px; color: #1f2937; margin-bottom: 20px; }
-        #reader { width: 100%; border-radius: 8px; overflow: hidden; margin-bottom: 20px; }
-        #status-msg { font-weight: bold; font-size: 18px; padding: 10px; border-radius: 8px; min-height: 25px; transition: 0.3s; }
-        .success { background-color: #dcfce7; color: #16a34a; }
-        .error { background-color: #fee2e2; color: #dc2626; }
-        .idle { background-color: #e5e7eb; color: #4b5563; }
-        
-        /* Giao diện nhập tay phòng hờ camera mờ */
-        .manual-input { margin-top: 20px; display: flex; gap: 10px; }
-        .manual-input input { flex: 1; padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 16px; outline: none; }
-        .manual-input button { padding: 12px 20px; background: #2563eb; color: white; border: none; border-radius: 6px; font-weight: bold; font-size: 16px; cursor: pointer; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; padding: 0;
+            background-color: #111827;
+            color: #f9fafb;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Thanh trạng thái đỉnh */
+        .header-bar {
+            padding: 10px 16px;
+            background: #1f2937;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+            border-bottom: 1px solid #374151;
+            z-index: 10;
+        }
+        .header-title { font-weight: 700; color: #60a5fa; font-size: 16px; }
+        .engine-badge { font-size: 11px; padding: 3px 8px; border-radius: 9999px; background: #374151; color: #9ca3af; }
+
+        /* Vùng hiển thị camera */
+        .camera-container {
+            position: relative;
+            flex: 1;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* Khung ngắm mã vạch (ROI) */
+        .scanner-frame-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+        .aiming-box {
+            width: 82%;
+            max-width: 340px;
+            height: 160px;
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
+            position: relative;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .aiming-box.scanned {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4000px rgba(59, 130, 246, 0.25);
+        }
+        .aiming-box.error {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 4000px rgba(239, 68, 68, 0.25);
+        }
+
+        /* Tia laser quét hiệu ứng */
+        .laser-line {
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #10b981, transparent);
+            top: 50%;
+            animation: scanning 2s infinite ease-in-out;
+        }
+        @keyframes scanning {
+            0% { top: 10%; opacity: 0.2; }
+            50% { top: 90%; opacity: 1; }
+            100% { top: 10%; opacity: 0.2; }
+        }
+
+        .frame-hint {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #e5e7eb;
+            background: rgba(0,0,0,0.6);
+            padding: 4px 12px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        /* Thanh điều khiển zoom / đèn flash */
+        .cam-controls {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            pointer-events: auto;
+            z-index: 5;
+        }
+        .icon-btn {
+            background: rgba(31, 41, 55, 0.85);
+            border: 1px solid #4b5563;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+
+        /* Hộp thông báo trạng thái */
+        .status-box {
+            padding: 12px 16px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 15px;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.3s;
+        }
+        .status-idle { background: #1f2937; color: #d1d5db; }
+        .status-success { background: #065f46; color: #6ee7b7; }
+        .status-error { background: #991b1b; color: #fecaca; }
+        .status-info { background: #1e40af; color: #93c5fd; }
+
+        /* Khu vực nút bấm dưới cùng */
+        .bottom-action-panel {
+            padding: 14px 16px;
+            background: #1f2937;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-top: 1px solid #374151;
+        }
+
+        /* Nút Báo Lỗi To Rõ Ràng Cho Nhân Viên */
+        .btn-report-error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 800;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+        }
+        .btn-report-error:active {
+            transform: scale(0.98);
+            background: #b91c1c;
+        }
+
+        /* Khu vực nhập mã tay dự phòng */
+        .manual-row {
+            display: flex;
+            gap: 8px;
+        }
+        .manual-row input {
+            flex: 1;
+            padding: 10px 12px;
+            background: #111827;
+            border: 1px solid #4b5563;
+            border-radius: 8px;
+            color: white;
+            font-size: 15px;
+            outline: none;
+        }
+        .manual-row button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 10px 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Đưa mã vạch vào khung hình</h1>
-        
-        <!-- Khu vực hiển thị Camera -->
-        <div id="reader"></div>
-        
-        <!-- Khung báo kết quả -->
-        <div id="status-msg" class="idle">Sẵn sàng quét...</div>
+    <div class="header-bar">
+        <div class="header-title">Trạm Quét Tem (Trạm 1)</div>
+        <div id="engine-tag" class="engine-badge">Đang khởi tạo...</div>
+    </div>
 
-        <!-- Khung nhập tay dự phòng -->
-        <div class="manual-input">
-            <input type="text" id="manual-code" placeholder="Hoặc nhập mã tay..." autocomplete="off">
-            <button onclick="sendManualCode()">Gửi</button>
+    <div class="camera-container">
+        <video id="webcam" playsinline autoplay muted></video>
+
+        <!-- Khung ngắm căn chỉnh quét -->
+        <div class="scanner-frame-overlay">
+            <div class="aiming-box" id="aiming-box">
+                <div class="laser-line"></div>
+            </div>
+            <div class="frame-hint">Để mã vạch lọt vào khung xanh (cự ly 15-25cm)</div>
+        </div>
+
+        <!-- Phím zoom hỗ trợ ống kính iPhone -->
+        <div class="cam-controls">
+            <button class="icon-btn" id="btn-zoom" onclick="cycleZoom()">Zoom: 1x</button>
+            <button class="icon-btn" id="btn-torch" onclick="toggleTorch()" style="display:none;">💡 Bật Đèn</button>
         </div>
     </div>
 
-    <!-- Nhúng thư viện quét mã vạch HTML5 -->
-    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-    <script>
-        const statusMsg = document.getElementById('status-msg');
-        let isScanningPaused = false; // Biến chặn quét liên tục 1 mã nhiều lần
+    <!-- Thông báo trạng thái quét -->
+    <div id="status-display" class="status-box status-idle">
+        Sẵn sàng quét...
+    </div>
 
-        // Hàm bắn API sang Server (Trạm 2)
-        async function sendBarcodeToServer(barcode) {
+    <!-- Nút bấm tác vụ nhanh -->
+    <div class="bottom-action-panel">
+        <button class="btn-report-error" onclick="reportUnscannable()">
+            <span>⚠️</span> KHÔNG QUÉT ĐƯỢC / CHỤP ẢNH LỖI
+        </button>
+
+        <div class="manual-row">
+            <input type="text" id="manual-barcode" placeholder="Nhập mã tay nếu cần..." autocomplete="off">
+            <button onclick="submitManualBarcode()">Gửi</button>
+        </div>
+    </div>
+
+    <!-- Canvas ẩn dùng để crop frame nét cao và quét fallback -->
+    <canvas id="hidden-canvas" style="display:none;"></canvas>
+
+    <!-- Fallback ZXing CDN cho trình duyệt chưa hỗ trợ native BarcodeDetector -->
+    <script src="https://unpkg.com/@zxing/library@latest"></script>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const hiddenCanvas = document.getElementById('hidden-canvas');
+        const statusDisplay = document.getElementById('status-display');
+        const aimingBox = document.getElementById('aiming-box');
+        const engineTag = document.getElementById('engine-tag');
+        const btnZoom = document.getElementById('btn-zoom');
+        const btnTorch = document.getElementById('btn-torch');
+
+        let videoTrack = null;
+        let barcodeDetector = null;
+        let zxingReader = null;
+        let isScanLocked = false;
+        let currentZoom = 1.0;
+        let isTorchOn = false;
+        let scanLoopId = null;
+
+        // Âm thanh báo "Bíp" bằng Web Audio API thuần (không cần tải file)
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playBeep(isSuccess = true) {
+            try {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                
+                if (isSuccess) {
+                    osc.frequency.setValueAtTime(880, audioCtx.currentTime); // Âm La cao
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.12);
+                } else {
+                    osc.frequency.setValueAtTime(320, audioCtx.currentTime); // Âm trầm báo lỗi
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.25);
+                }
+            } catch(e) {}
+        }
+
+        // Rung thiết bị
+        function vibrate(pattern) {
+            if (navigator.vibrate) navigator.vibrate(pattern);
+        }
+
+        // Hiển thị trạng thái
+        function setStatus(text, type = 'idle', timeout = 2500) {
+            statusDisplay.innerText = text;
+            statusDisplay.className = `status-box status-${type}`;
+            if (type === 'success') {
+                aimingBox.className = 'aiming-box scanned';
+            } else if (type === 'error') {
+                aimingBox.className = 'aiming-box error';
+            } else {
+                aimingBox.className = 'aiming-box';
+            }
+
+            if (timeout > 0) {
+                setTimeout(() => {
+                    statusDisplay.innerText = "Sẵn sàng quét...";
+                    statusDisplay.className = "status-box status-idle";
+                    aimingBox.className = "aiming-box";
+                }, timeout);
+            }
+        }
+
+        // Khởi động Camera độ nét cao
+        async function initCamera() {
+            try {
+                const constraints = {
+                    audio: false,
+                    video: {
+                        facingMode: { ideal: "environment" },
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        frameRate: { ideal: 30 }
+                    }
+                };
+
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
+
+                // Kiểm tra hỗ trợ Zoom & Torch phần cứng
+                if (videoTrack) {
+                    const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+                    if (capabilities.torch) btnTorch.style.display = 'block';
+                    if (!capabilities.zoom) btnZoom.style.display = 'none'; // Không hỗ trợ zoom phần cứng thì ẩn
+                }
+
+                video.onloadedmetadata = () => {
+                    video.play();
+                    initScannerEngine();
+                };
+            } catch (err) {
+                console.error("Lỗi Camera:", err);
+                setStatus("🔴 Không mở được Camera. Vui lòng cấp quyền!", "error", 0);
+            }
+        }
+
+        // Khởi tạo Engine quét: Ưu tiên Apple Native BarcodeDetector (iOS 17+ / Chrome Android)
+        async function initScannerEngine() {
+            if ('BarcodeDetector' in window) {
+                try {
+                    const supportedFormats = await BarcodeDetector.getSupportedFormats();
+                    const desiredFormats = ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'qr_code'];
+                    const formats = desiredFormats.filter(f => supportedFormats.includes(f));
+                    
+                    barcodeDetector = new BarcodeDetector({ formats: formats.length ? formats : supportedFormats });
+                    engineTag.innerText = "⚡ Phần cứng (Apple Vision/ML)";
+                    engineTag.style.background = "#065f46";
+                    engineTag.style.color = "#6ee7b7";
+                } catch(e) {
+                    barcodeDetector = null;
+                }
+            }
+
+            if (!barcodeDetector) {
+                // Fallback ZXing
+                try {
+                    zxingReader = new ZXing.BrowserMultiFormatReader();
+                    engineTag.innerText = "⚙️ ZXing Software Engine";
+                } catch(e) {
+                    console.error("ZXing init fail", e);
+                }
+            }
+
+            startContinuousScanning();
+        }
+
+        // Vòng lặp quét liên tục
+        function startContinuousScanning() {
+            const ctx = hiddenCanvas.getContext('2d', { willReadFrequently: true });
+
+            async function scanFrame() {
+                if (!isScanLocked && video.readyState === video.HAVE_ENOUGH_DATA) {
+                    try {
+                        let detectedCode = null;
+
+                        if (barcodeDetector) {
+                            // Dùng Native BarcodeDetector: Quét trực tiếp video element siêu nhanh
+                            const barcodes = await barcodeDetector.detect(video);
+                            if (barcodes.length > 0) {
+                                detectedCode = barcodes[0].rawValue;
+                            }
+                        } else if (zxingReader) {
+                            // Cắt vùng ngắm trung tâm (ROI) đưa vào ZXing để nét và không lag
+                            const vw = video.videoWidth;
+                            const vh = video.videoHeight;
+                            
+                            // Lấy 60% chiều rộng, 35% chiều cao ở trung tâm
+                            const cropW = Math.floor(vw * 0.65);
+                            const cropH = Math.floor(vh * 0.40);
+                            const cropX = Math.floor((vw - cropW) / 2);
+                            const cropY = Math.floor((vh - cropH) / 2);
+
+                            hiddenCanvas.width = cropW;
+                            hiddenCanvas.height = cropH;
+                            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+
+                            try {
+                                const result = await zxingReader.decodeFromCanvas(hiddenCanvas);
+                                if (result) detectedCode = result.getText();
+                            } catch(e) {
+                                // Bỏ qua frame không có mã
+                            }
+                        }
+
+                        if (detectedCode) {
+                            onBarcodeScanned(detectedCode);
+                        }
+                    } catch(err) {
+                        // Bỏ qua lỗi từng frame
+                    }
+                }
+                scanLoopId = requestAnimationFrame(scanFrame);
+            }
+
+            scanLoopId = requestAnimationFrame(scanFrame);
+        }
+
+        // Xử lý khi nhận diện được mã
+        async function onBarcodeScanned(barcode) {
+            isScanLocked = true;
+            playBeep(true);
+            vibrate(100);
+            setStatus(`🔍 Đang kiểm tra: ${barcode}`, "info", 1000);
+
             try {
                 const res = await fetch('/api/scan', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ barcode: barcode })
                 });
-                
                 const data = await res.json();
-                
-                if (data.status === 'success') {
-                    showStatus(`✅ Đã nhận: ${barcode}`, 'success');
+
+                if (data.success) {
+                    setStatus(`✅ ĐÃ IN: ${barcode}`, "success", 2000);
                 } else {
-                    showStatus(`❌ Mã chưa có: ${barcode}`, 'error');
+                    playBeep(false);
+                    vibrate([100, 50, 100]);
+                    setStatus(`❌ Chưa có trong kho: ${barcode}`, "error", 2500);
                 }
             } catch (err) {
-                showStatus(`⚠️ Lỗi mạng!`, 'error');
+                setStatus(`⚠️ Lỗi mạng tới Server Trạm 2`, "error", 2000);
             }
-        }
 
-        // Hàm hiển thị màu sắc trạng thái
-        function showStatus(text, type) {
-            statusMsg.innerText = text;
-            statusMsg.className = type;
+            // Nghỉ 1.8 giây rồi mở lại để tránh quét trùng 1 mã nhiều lần
             setTimeout(() => {
-                statusMsg.innerText = "Sẵn sàng quét...";
-                statusMsg.className = "idle";
-            }, 2500); // Tự động reset màu sau 2.5 giây
+                isScanLocked = false;
+            }, 1800);
         }
 
-        // Khởi tạo Camera (Đã tối ưu cho Safari)
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader",
-            { 
-                fps: 20, 
-                qrbox: {width: 300, height: 150}, 
-                // ĐIỂM SỬA 1: Bỏ dòng aspectRatio: 1.0 đi vì Safari trên iOS rất hay bị lỗi ép khung hình video
-                // ĐIỂM SỬA 2: Ép trình duyệt phải gọi thẳng vào Camera sau của điện thoại
-                videoConstraints: { facingMode: "environment" } 
-            },
-            /* verbose= */ false
-        );
+        // NÚT BÁO LỖI: Chụp ảnh nét gốc từ video và gửi thẳng về Trạm 2
+        async function reportUnscannable() {
+            if (!video.videoWidth || !video.videoHeight) return alert("Camera chưa sẵn sàng!");
 
-        // Chạy khi Camera bắt được mã
-        function onScanSuccess(decodedText, decodedResult) {
-            if (isScanningPaused) return; 
-            
-            isScanningPaused = true; 
-            sendBarcodeToServer(decodedText);
-            
-            setTimeout(() => {
-                isScanningPaused = false;
-            }, 2000);
+            setStatus("📸 Đang chụp khung hình nét gửi Trạm 2...", "info", 0);
+            vibrate([80, 50, 80]);
+
+            // Dùng canvas với độ phân giải gốc của camera
+            hiddenCanvas.width = video.videoWidth;
+            hiddenCanvas.height = video.videoHeight;
+            const ctx = hiddenCanvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, video.videoWidth, video.videoHeight);
+
+            hiddenCanvas.toBlob(async (blob) => {
+                if (!blob) return setStatus("Lỗi chụp ảnh!", "error");
+
+                const formData = new FormData();
+                formData.append('image', blob, `error-${Date.now()}.jpg`);
+                formData.append('barcode', '⚠️ Ca khó (Đã gửi ảnh)');
+
+                try {
+                    const res = await fetch('/api/report-error', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    const data = await res.json();
+
+                    if (data.success) {
+                        playBeep(true);
+                        vibrate([100, 80, 100]);
+                        setStatus("✅ ĐÃ GỬI ẢNH VỀ TRẠM 2! Tiếp tục quét món khác.", "success", 3000);
+                    } else {
+                        setStatus("❌ Lỗi gửi ảnh về Trạm 2", "error", 2500);
+                    }
+                } catch (err) {
+                    setStatus("⚠️ Không kết nối được Trạm 2!", "error", 2500);
+                }
+            }, 'image/jpeg', 0.88);
         }
 
-        // ĐIỂM SỬA 3: Bổ sung function(error) rỗng để chặn Safari báo lỗi ngầm liên tục khi khung hình chưa có mã vạch
-        html5QrcodeScanner.render(onScanSuccess, function(errorMessage) {
-            // Không làm gì cả
-        });
-
-        // Xử lý gửi mã bằng nút nhập tay
-        function sendManualCode() {
-            const input = document.getElementById('manual-code');
+        // Gửi mã nhập tay
+        function submitManualBarcode() {
+            const input = document.getElementById('manual-barcode');
             const code = input.value.trim();
             if (code) {
-                sendBarcodeToServer(code);
+                onBarcodeScanned(code);
                 input.value = '';
-                input.focus();
             }
         }
-
-        // Bắt phím Enter cho ô nhập tay
-        document.getElementById('manual-code').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') sendManualCode();
+        document.getElementById('manual-barcode').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') submitManualBarcode();
         });
+
+        // Điều khiển Zoom
+        async function cycleZoom() {
+            if (!videoTrack) return;
+            try {
+                const capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+                if (!capabilities.zoom) return;
+
+                if (currentZoom === 1.0 && capabilities.zoom.max >= 1.5) currentZoom = 1.5;
+                else if (currentZoom === 1.5 && capabilities.zoom.max >= 2.0) currentZoom = 2.0;
+                else currentZoom = 1.0;
+
+                await videoTrack.applyConstraints({ advanced: [{ zoom: currentZoom }] });
+                btnZoom.innerText = `Zoom: ${currentZoom}x`;
+            } catch(e) {}
+        }
+
+        // Bật / tắt đèn Flash
+        async function toggleTorch() {
+            if (!videoTrack) return;
+            try {
+                isTorchOn = !isTorchOn;
+                await videoTrack.applyConstraints({ advanced: [{ torch: isTorchOn }] });
+                btnTorch.innerText = isTorchOn ? "💡 Tắt Đèn" : "💡 Bật Đèn";
+            } catch(e) {}
+        }
+
+        window.addEventListener('DOMContentLoaded', initCamera);
     </script>
 </body>
 </html>

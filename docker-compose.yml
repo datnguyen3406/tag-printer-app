@@ -10,4 +10,5 @@ services:
       - ./config:/app/config:Z
       - ./templates:/app/templates:Z
       - ./public:/app/public:Z
+      - ./server.js:/app/server.js:Z
     restart: always
