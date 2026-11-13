@@ -39,6 +39,9 @@
         .err-thumb { width: 54px; height: 54px; object-fit: cover; border-radius: 6px; cursor: pointer; border: 2px solid #f87171; flex-shrink: 0; transition: transform 0.2s; }
         .err-thumb:hover { transform: scale(1.08); box-shadow: 0 4px 8px rgba(0,0,0,0.15); }
         .modal-img-preview { width: 100%; max-height: 220px; object-fit: contain; border-radius: 6px; margin-bottom: 12px; border: 1px solid #e5e7eb; background: #111; }
+        .btn-ai { background: linear-gradient(135deg, #7c3aed, #6366f1); color: white; padding: 6px 12px; font-size: 12px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-ai:hover { opacity: 0.9; transform: scale(1.03); }
+        .badge-ai { background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: bold; margin-left: 6px; border: 1px solid #c4b5fd; }
         
         #print-area { display: none; }
         @media print {
@@ -163,7 +166,10 @@
         </div>
 
         <div class="column col-error">
-            <h2>Mã Lỗi (<span id="count-error">0</span>)</h2>
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #dc2626; padding-bottom: 10px; margin-bottom: 15px;">
+                <h2 style="margin: 0; padding: 0; border: none; color: #dc2626;">Mã Lỗi (<span id="count-error">0</span>)</h2>
+                <button class="btn-ai" id="btn-ai-all" onclick="runAIScanAll()" title="Dùng thuật toán OpenCV quét phục hồi lại toàn bộ ảnh lỗi">Lược hàng Đợi</button>
+            </div>
             <div id="list-error"></div>
         </div>
     </div>
@@ -313,9 +319,10 @@
                 currentMatchedList = data.matched;
                 
                 document.getElementById('count-matched').innerText = data.matched.length;
-                document.getElementById('list-matched').innerHTML = data.matched.map(p => 
-                    `<div class="item"><span>${p.barcode} - <b>${p.tenSp}</b><br><small>${p.ticket}đ</small></span> <button class="btn btn-del" onclick="removeItem(${p.id}, 'matched')">X</button></div>`
-                ).join('');
+                document.getElementById('list-matched').innerHTML = data.matched.map(p => {
+                    const aiBadge = p.aiRecognized ? `<span class="badge-ai" title="${p.method || 'OpenCV'}">🤖 OpenCV</span>` : '';
+                    return `<div class="item"><span>${p.barcode} - <b>${p.tenSp}</b>${aiBadge}<br><small>${p.ticket}đ</small></span> <button class="btn btn-del" onclick="removeItem(${p.id}, 'matched')">X</button></div>`;
+                }).join('');
 
                 document.getElementById('count-error').innerText = data.error.length;
                 
@@ -408,6 +415,25 @@
         async function resolveError(correctBarcode) {
             await fetch('/api/resolve', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ errorId: resolvingErrorId, correctBarcode: correctBarcode }) });
             closeModal(); fetchQueue(); 
+        }
+
+        async function runAIScanAll() {
+            const btn = document.getElementById('btn-ai-all');
+            if (btn.disabled) return;
+            btn.disabled = true;
+            const originalText = btn.innerText;
+            btn.innerText = "⏳ Đang chạy OpenCV...";
+            try {
+                const res = await fetch('/api/ai-scan-all', { method: 'POST' });
+                const data = await res.json();
+                alert(data.message);
+                fetchQueue();
+            } catch (err) {
+                alert("Không thể kết nối với dịch vụ OpenCV");
+            } finally {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
         }
     </script>
 </body>

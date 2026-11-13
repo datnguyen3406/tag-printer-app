@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const xlsx = require('xlsx');
 const multer = require('multer');
+const { execFile } = require('child_process');
 
 const app = express();
 const PORT = 3000;
@@ -205,19 +206,143 @@ app.post('/api/scan', (req, res) => {
     }
 });
 
-// --- Nhận ảnh báo lỗi / không quét được từ Trạm 1 ---
-app.post('/api/report-error', uploadError.single('image'), (req, res) => {
+// --- Module gọi OpenCV Python để giải mã ảnh ca khó ---
+function runOpenCVScan(imageFullPath) {
+    return new Promise((resolve) => {
+        if (!fs.existsSync(imageFullPath)) {
+            return resolve({ success: false, message: "File ảnh không tồn tại" });
+        }
+        const scriptPath = path.join(__dirname, 'ai_scanner.py');
+        execFile('python3', [scriptPath, imageFullPath], { timeout: 10000 }, (error, stdout, stderr) => {
+            if (error) {
+                console.log("OpenCV execution note:", error.message);
+                return resolve({ success: false, message: error.message });
+            }
+            try {
+                const parsed = JSON.parse(stdout.trim());
+                resolve(parsed);
+            } catch (e) {
+                resolve({ success: false, message: "Lỗi đọc kết quả OpenCV" });
+            }
+        });
+    });
+}
+
+// --- Nhận ảnh báo lỗi từ Trạm 1 & Tự động chạy OpenCV nhận diện ngay ---
+app.post('/api/report-error', uploadError.single('image'), async (req, res) => {
     const imageUrl = req.file ? `/uploads/errors/${req.file.filename}` : '';
     const note = (req.body.note || '').trim();
+    const fullPath = req.file ? req.file.path : null;
+
+    let aiResult = { success: false };
+    if (fullPath) {
+        // Chạy OpenCV quét thử ảnh vừa nhận
+        aiResult = await runOpenCVScan(fullPath);
+    }
+
+    if (aiResult.success && aiResult.barcode) {
+        const detectedBarcode = aiResult.barcode.trim();
+        const foundProduct = masterDictionary[detectedBarcode];
+
+        if (foundProduct) {
+            // Tự động giải cứu thành công! Chuyển thẳng sang hàng in Chờ In
+            const matchedItem = {
+                id: Date.now(),
+                ...foundProduct,
+                aiRecognized: true,
+                method: aiResult.method || 'OpenCV',
+                imageUrl: imageUrl
+            };
+            printQueue.matched.push(matchedItem);
+            return res.json({
+                success: true,
+                aiResolved: true,
+                barcode: detectedBarcode,
+                message: `🤖 OpenCV đã tự nhận diện thành công mã: ${detectedBarcode} (${foundProduct.tenSp})! Đã chuyển sang hàng in.`,
+                item: matchedItem
+            });
+        } else {
+            // Đọc được mã nhưng chưa có trong Excel -> lưu mã thật vào hàng đợi lỗi
+            const errorItem = {
+                id: Date.now(),
+                barcode: detectedBarcode,
+                imageUrl: imageUrl,
+                suggestedName: `OpenCV đọc được mã ${detectedBarcode} (Chưa có trong Excel)`,
+                time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                aiScanned: true
+            };
+            printQueue.error.unshift(errorItem);
+            return res.json({
+                success: true,
+                aiResolved: false,
+                barcode: detectedBarcode,
+                message: `🤖 OpenCV đọc được mã: ${detectedBarcode} nhưng chưa có trong danh mục Excel!`,
+                item: errorItem
+            });
+        }
+    }
+
+    // Nếu ảnh quá nát hoặc chưa đọc được -> đưa vào hàng đợi lỗi để quản lý xử lý
     const errorItem = {
         id: Date.now(),
         barcode: req.body.barcode || '⚠️ Không đọc được (Có ảnh)',
         imageUrl: imageUrl,
         suggestedName: note,
-        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        time: new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        aiScanned: true
     };
-    printQueue.error.unshift(errorItem); // Đưa lên đầu danh sách lỗi
-    res.json({ success: true, message: "Đã báo lỗi và gửi ảnh thành công!", item: errorItem });
+    printQueue.error.unshift(errorItem);
+    res.json({ success: true, aiResolved: false, message: "Đã lưu ảnh vào hàng đợi lỗi để quản lý đối soát!", item: errorItem });
+});
+
+// --- API quét lại toàn bộ hàng đợi lỗi bằng OpenCV ---
+app.post('/api/ai-scan-all', async (req, res) => {
+    if (printQueue.error.length === 0) {
+        return res.json({ success: true, count: 0, message: "Hàng đợi lỗi đang trống!" });
+    }
+
+    let successCount = 0;
+    const remainingErrors = [];
+
+    for (const err of printQueue.error) {
+        if (!err.imageUrl) {
+            remainingErrors.push(err);
+            continue;
+        }
+
+        const localPath = path.join(__dirname, 'public', err.imageUrl);
+        const aiResult = await runOpenCVScan(localPath);
+
+        if (aiResult.success && aiResult.barcode) {
+            const detectedCode = aiResult.barcode.trim();
+            const foundProduct = masterDictionary[detectedCode];
+
+            if (foundProduct) {
+                printQueue.matched.push({
+                    id: Date.now() + Math.floor(Math.random() * 1000),
+                    ...foundProduct,
+                    aiRecognized: true,
+                    method: aiResult.method || 'OpenCV Batch',
+                    imageUrl: err.imageUrl
+                });
+                successCount++;
+            } else {
+                err.barcode = detectedCode;
+                err.suggestedName = `OpenCV đọc được ${detectedCode} (Chưa có trong Excel)`;
+                remainingErrors.push(err);
+            }
+        } else {
+            remainingErrors.push(err);
+        }
+    }
+
+    printQueue.error = remainingErrors;
+    res.json({
+        success: true,
+        resolvedCount: successCount,
+        remainingCount: remainingErrors.length,
+        message: `🤖 OpenCV đã tự động giải cứu thành công ${successCount} mã lỗi!`
+    });
 });
 
 app.get('/api/queue', (req, res) => res.json(printQueue));

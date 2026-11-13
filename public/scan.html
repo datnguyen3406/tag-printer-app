@@ -4,20 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Trạm Quét Mã (Trạm 1)</title>
+    
+    <!-- Cấu hình PWA & iOS Safari Standalone -->
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Trạm Quét">
     <meta name="theme-color" content="#111827">
+    <meta name="format-detection" content="telephone=no">
+
     <style>
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-        body {
+        html, body {
             margin: 0; padding: 0;
             background-color: #111827;
             color: #f9fafb;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            height: 100vh;
+            height: 100%;
+            height: -webkit-fill-available;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            overscroll-behavior: none;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
         }
 
         /* Thanh trạng thái đỉnh */
@@ -199,9 +212,36 @@
             font-weight: 600;
             cursor: pointer;
         }
+
+        /* Banner hướng dẫn cài đặt PWA */
+        .pwa-banner {
+            background: #2563eb;
+            color: white;
+            padding: 8px 14px;
+            font-size: 13px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+        }
+        .pwa-banner button {
+            background: transparent;
+            border: none;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin-left: 10px;
+        }
     </style>
 </head>
 <body>
+
+    <!-- Banner hướng dẫn ghim ra Màn hình chính nếu chưa ở chế độ App PWA -->
+    <div id="pwa-install-banner" class="pwa-banner" style="display:none;">
+        <span>📱 Dùng toàn màn hình: Bấm <b>Chia sẻ (⎋)</b> ➔ Chọn <b>"Thêm vào MH chính"</b></span>
+        <button onclick="dismissPwaBanner()">✕</button>
+    </div>
 
     <div class="header-bar">
         <div class="header-title">Trạm Quét Tem (Trạm 1)</div>
@@ -542,7 +582,57 @@
             } catch(e) {}
         }
 
-        window.addEventListener('DOMContentLoaded', initCamera);
+        // --- PWA: Đăng ký Service Worker ---
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('✅ PWA ServiceWorker active:', reg.scope))
+                    .catch(err => console.log('SW fail:', err));
+            });
+        }
+
+        // --- PWA: Giữ màn hình luôn sáng (Screen Wake Lock) ---
+        let wakeLock = null;
+        async function requestScreenWakeLock() {
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('💡 Screen Wake Lock: Active (Màn hình luôn sáng)');
+                }
+            } catch (err) {}
+        }
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                requestScreenWakeLock();
+                // Khôi phục Camera nếu bị Safari tạm dừng khi tắt màn hình/chuyển app
+                if (!video.srcObject || !videoTrack || videoTrack.readyState === 'ended') {
+                    console.log('🔄 Đang kích hoạt lại camera sau khi mở lại app...');
+                    initCamera();
+                } else if (video.paused) {
+                    video.play().catch(() => {});
+                }
+            }
+        });
+
+        // --- PWA: Kiểm tra xem đã cài ra Home Screen (Standalone) chưa ---
+        function checkStandalone() {
+            const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+            const banner = document.getElementById('pwa-install-banner');
+            const dismissed = sessionStorage.getItem('pwa-dismissed');
+            if (!isStandalone && !dismissed) {
+                banner.style.display = 'flex';
+            }
+        }
+        function dismissPwaBanner() {
+            document.getElementById('pwa-install-banner').style.display = 'none';
+            sessionStorage.setItem('pwa-dismissed', 'true');
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initCamera();
+            requestScreenWakeLock();
+            checkStandalone();
+        });
     </script>
 </body>
 </html>

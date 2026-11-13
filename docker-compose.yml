@@ -11,4 +11,5 @@ services:
       - ./templates:/app/templates:Z
       - ./public:/app/public:Z
       - ./server.js:/app/server.js:Z
+      - ./ai_scanner.py:/app/ai_scanner.py:Z
     restart: always
